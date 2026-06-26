@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 
 api_key_ai = st.secrets["API_KEY_AI"]
-genai.configure(api_key=api_key_ai)
+
 
 CONFIRM_KEY= st.secrets["API_KEY_DATA"]
 
@@ -690,7 +690,8 @@ elif st.session_state.page == 4:
         )
     }
             print(soil_data)
-            model = genai.GenerativeModel('gemini-2.5-flash', request_options={"timeout": 120} )
+            genai.configure(api_key=api_key_ai)
+            model = genai.GenerativeModel('gemini-3.5-flash', request_options={"timeout": 120} )
             context = f"""
                 너는 전문 농업 컨설턴트이다.
 
