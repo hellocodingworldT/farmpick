@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 
 api_key_ai = st.secrets["API_KEY_AI"]
-genai.configure(api_key="api_key_ai")
+genai.configure(api_key=api_key_ai)
 
 CONFIRM_KEY= st.secrets["API_KEY_DATA"]
 
@@ -638,7 +638,7 @@ elif st.session_state.page == 4:
 
     if st.button("나에게 맞는 작물 찾기"):
         with st.spinner("🌱 토양 정보를 분석하는 중입니다..."):
-            result = get_soil_data(st.session_state["pnu"], CONFIRM_KEY)
+            result = get_soil_data(st.session_state["pnu"], api_key_ai)
         
         if result:
             root = ET.fromstring(result)
