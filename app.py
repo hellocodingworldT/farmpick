@@ -638,7 +638,7 @@ elif st.session_state.page == 4:
 
     if st.button("나에게 맞는 작물 찾기"):
         with st.spinner("🌱 토양 정보를 분석하는 중입니다..."):
-            result = get_soil_data(st.session_state["pnu"], api_key_ai)
+            result = get_soil_data(st.session_state["pnu"], CONFIRM_KEY)
         
         if result:
             root = ET.fromstring(result)
@@ -690,7 +690,7 @@ elif st.session_state.page == 4:
         )
     }
             print(soil_data)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            model = genai.GenerativeModel('gemini-2.5-flash', request_options={"timeout": 120} )
             context = f"""
                 너는 전문 농업 컨설턴트이다.
 
