@@ -691,7 +691,7 @@ elif st.session_state.page == 4:
     }
             print(soil_data)
             genai.configure(api_key=api_key_ai)
-            model = genai.GenerativeModel('gemini-3.5-flash', request_options={"timeout": 120} )
+            model = genai.GenerativeModel('gemini-3.5-flash' )
             context = f"""
                 너는 전문 농업 컨설턴트이다.
 
