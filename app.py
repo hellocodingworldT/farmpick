@@ -2,10 +2,8 @@ import streamlit as st
 import requests
 import xml.etree.ElementTree as ET # API가 XML 형식일 경우
 import google.generativeai as genai
+
 import xml.etree.ElementTree as ET
-
-
-
 api_key_ai = st.secrets["API_KEY_AI"]
 
 
@@ -38,6 +36,30 @@ if "search_results" not in st.session_state:
 # 3. 버튼을 누르면 페이지 번호를 바꿔주는 함수
 def go_to_page(page_number):
     st.session_state.page = page_number
+
+
+def get_soil_data(pnu_code, service_key):
+# API 요청 URL (기술명세서에 있는 엔드포인트 주소)
+
+    url = "http://apis.data.go.kr/1390802/SoilEnviron/SoilCharac/V3/getSoilCharacter"
+
+# 전달할 파라미터 (지번코드, 서비스키 등)
+    params = {
+        'serviceKey': service_key,
+        'PNU_CD': pnu_code,
+
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            return response.text # 성공 시 데이터 반환
+        else:
+            return None
+    except Exception as e:
+        return str(e)
+
+
 
 
 # =========================
@@ -124,6 +146,7 @@ page_names = {
     2: "2. 농부 성향 입력",
     3: "3. 맞춤 작물 추천",
     4: "4. AI 농사 상담소"
+
 }
 
 
@@ -306,141 +329,141 @@ if st.session_state.page == 0:
 # 1페이지
 # ==========================================
 elif st.session_state.page == 1:
+    selected=''
+
+
+    # -----------------------------
+    # TITLE CARD
+    # -----------------------------
+    st.progress(20)
+
+    st.markdown("""
+    <div style='text-align:center;padding:20px'>
+        <h1>🌱어디에서 키우실 예정인가요?</h1>
+        <p style='font-size:20px;color:gray'>
+            토지 주소를 입력하면 AI가 최적의 작물을 추천합니다.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+
+
+    # -----------------------------
+    # ADDRESS INPUT
+    # -----------------------------
+
+
+  
+    st.markdown("#### 📍행정 구역 선택")
+    left,  right = st.columns([3,1])
+    with left:
+        address = st.text_input(
+            "",
+            placeholder="동 / 읍 / 면 / 리 입력"
+        )
+
+    adm_cd = ""
+    with right:
+        st.write("")
+        st.write("")  
+        if st.button("🔍 행정 구역 검색"):
+
+            url = "https://apis.data.go.kr/1741000/StanReginCd/getStanReginCdList"
+
+            params = {
+                "ServiceKey": CONFIRM_KEY,
+                "pageNo": 1,
+                "numOfRows": 10,
+                "type": "json",
+                "locatadd_nm": address
+            }
+
+            response = requests.get(url, params=params).json()
+
+            st.session_state.search_results = response["StanReginCd"][1]["row"]
+
+
+    # -----------------------------
+    # SEARCH RESULT
+    # -----------------------------
+
+
+    if st.session_state.search_results:
+
+        options = {
+            item["locatadd_nm"]: item["region_cd"]
+            for item in st.session_state.search_results
+        }
+
+        selected = st.selectbox(
+            "정확한 행정 구역 선택",
+            list(options.keys())
+        )
+
+        adm_cd = options[selected]
+
+
+    # -----------------------------
+    # LAND TYPE
+    # -----------------------------
+
+    st.markdown("#### 🌱 토지 종류")
+    mount = st.radio(
+        "",
+        ["일반", "산"],
+        horizontal=True
+    )
+
+    mountcode = 1 if mount == "일반" else 2
+
+
+    # -----------------------------
+    # JIBUN INPUT
+    # -----------------------------
+
+    st.markdown("#### 📝 지번 / 부번 입력")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        jibun = st.text_input("번지", placeholder="예: 123")
+
+    with col2:
+        boobun = st.text_input("상세 지번(없는 경우 입력 안해도 됨)", placeholder="예: 2")
+
+
+    # -----------------------------
+    # PNU CREATE
+    # -----------------------------
+    if address and jibun:
+
+        adm_cd_safe = adm_cd if adm_cd else "000000"
+
+        st.session_state.pnu = (
+            adm_cd_safe +
+            str(mountcode) +
+            jibun.zfill(4) +
+            boobun.zfill(4)
+        )
+    if boobun:
+        st.session_state.full_address = f"{selected} {jibun}-{boobun}"
+    else:
+        st.session_state.full_address = f"{selected} {jibun}"
+
+# -----------------------------
+# NEXT BUTTON
+# -----------------------------
+    st.write("")
+    left, center, right = st.columns([1, 2, 1])
+    with center:
+        if st.button('\n\n다음 단계👉\n\n',use_container_width=True):
+            go_to_page(2)
+            st.rerun()
+
+
+    
     
 
-
-    st.title("어디서 키우실 건가요? 🏡")
-    addrees = st.text_input("동/읍/면/리 를 입력해주세요")
-    adm_cd=''
-    if st.button("주소검색"):
-        url = "https://apis.data.go.kr/1741000/StanReginCd/getStanReginCdList"
-        params = {"ServiceKey": CONFIRM_KEY, "pageNo": 1, "numOfRows": 10, "type": "json", "locatadd_nm": addrees}
-
-        response = requests.get(url, params=params).json()
-        # st.write(response.text)
-        st.session_state.search_results = response["StanReginCd"][1]['row']
-
-    if st.session_state.get("search_results"):
-        # API 응답 필드명에 맞춰 키값 수정 (locatadd_nm 사용)
-        # options {= {f"{item['locatadd_nm']}": item for item in st.session_state.search_results}}
-        options={}
-        for item in st.session_state.search_results:
-            options[item['locatadd_nm']]=item['region_cd']
-
-
-        if options !="":
-            selected = st.selectbox("정확한 주소를 선택하세요", list(options.keys()))
-            adm_cd = options[selected]
-            # adm_cd = selected_addr.get("region_cd"
-        
-    mount = st.radio("산인지 토지인지 선택하세요",['일반','산'])
-    if mount == '일반':
-        mountcode = 1
-    else:
-        mountcode = 2
-        
-    jibun = st.text_input('지번을 입력하세요')
-    boobun = st.text_input('부번을 입력하세요')
-
-    st.session_state.pnu = ( adm_cd + str(mountcode) + jibun.zfill(4) + boobun.zfill(4) )
-
-    if st.button('다음'):
-        go_to_page(2)
-        
-
-
-
-
-#============================================
-# 수정 전 코드
-#============================================    
-#     st.title("어디서 키우실 건가요? 🏡")
-#     st.write("📍카카오/행안부 주소 검색 API 연동")   
-#     st.write("정확한 토양 분석을 위해 텃밭의 도로명이나 동 이름을 검색해주세요. (예: 둔산동, 판교역로)")
-#    # 발급받은 승인키 입력
-#     CONFIRM_KEY = "devU01TX0FVVEgyMDI2MDUzMDExMTMyODExODk2MzU="
-
-#     st.title("도로명 주소 검색")
-
-#     keyword = st.text_input("주소 검색", placeholder="예: 판교역로 235")
-
-#     def search_address(keyword):
-#         url = "https://business.juso.go.kr/addrlink/addrLinkApi.do"
-
-#         params = {
-#             "confmKey": CONFIRM_KEY,
-#             "currentPage": 1,
-#             "countPerPage": 20,
-#             "keyword": keyword,
-#             "resultType": "json"
-#         }
-
-#         response = requests.get(url, params=params)
-#         response.raise_for_status()
-
-#         data = response.json()
-#         return data
-
-#     if st.button("주소검색"):
-
-#         try:
-#             result = search_address(keyword)
-
-#             common = result["results"]["common"]
-
-#             if common["errorCode"] != "0":
-#                 st.error(common["errorMessage"])
-
-#             else:
-#                 addresses = result["results"]["juso"]
-
-#                 if not addresses:
-#                     st.warning("검색 결과가 없습니다.")
-
-#                 else:
-#                     options = {
-#                         f"{item['roadAddr']} ({item['zipNo']})": item
-#                         for item in addresses
-#                     }
-
-#                     selected = st.selectbox(
-#                         "정확한 주소를 선택하세요",
-#                         list(options.keys())
-#                     )
-
-#                     selected_addr = options[selected]
-
-#                     st.success("선택 완료")
-           
-
-#                     st.write("### 주소 정보")
-#                     st.write("도로명주소:", selected_addr["roadAddr"])
-#                     st.write("지번주소:", selected_addr["jibunAddr"])
-#                     st.write("우편번호:", selected_addr["zipNo"])
-#                     st.write("시도:", selected_addr["siNm"])
-#                     st.write("시군구:", selected_addr["sggNm"])
-#                     st.write("읍면동:", selected_addr["emdNm"])
-
-#                     st.json(selected_addr)
-
-#                     pnu = (
-#                         str(selected_addr["admCd"])
-#                         + ("2" if selected_addr["mtYn"] == "1" else "2")
-#                         + str(selected_addr["lnbrMnnm"]).zfill(4)
-#                         + str(selected_addr["lnbrSlno"]).zfill(4)
-#                     )
-                    
-#                     st.write(pnu)
-#                     st.session_state["pnu"] = pnu
-#                     print("여긴 되나?")
-
-#         except Exception as e:
-#             st.error(str(e))
-
-#     if st.button("다음"):
-#         print("왜 안넘어가지?")
-#         go_to_page(2)
-#         st.rerun()
 
 # ==========================================
 # 2페이지
@@ -475,7 +498,7 @@ elif st.session_state.page == 2:
 
     </style>
     """, unsafe_allow_html=True)
-    st.progress(50)
+    st.progress(40)
 
     st.markdown("""
     <div style='text-align:center;padding:20px'>
@@ -544,12 +567,12 @@ elif st.session_state.page == 3:
     """, unsafe_allow_html=True)
 
 
-    st.progress(75)
+    st.progress(60)
 
     
     st.markdown("""
     <div style='text-align:center;padding:20px'>
-        <h1>🌱 작물을 키우는 목적은 무엇인가요?</h1>
+        <h1>🌱 키우는 목적은 무엇인가요?</h1>
         <p style='font-size:20px;color:gray'>
         목적에 따라 추천 작물이 달라집니다
         </p>
@@ -595,55 +618,127 @@ elif st.session_state.page == 3:
             go_to_page(4)
             st.rerun()
 
-
-
 # ==========================================
 # 4페이지
 # ==========================================
 elif st.session_state.page == 4:
-    st.title("당신을 위한 맞춤 작물 🍅")
+    st.markdown("""
+    <style>
 
-   
+    .stButton > button {
+        width:100%;
+        height:250px;
+        min-width: 150px;   /* 추가 */
+        border-radius:30px;
+        border:2px solid #dfe8df;
 
-    def get_soil_data(pnu_code, service_key):
-    # API 요청 URL (기술명세서에 있는 엔드포인트 주소)
-       
-        url = "http://apis.data.go.kr/1390802/SoilEnviron/SoilCharac/V3/getSoilCharacter"
-   
-    # 전달할 파라미터 (지번코드, 서비스키 등)
-        params = {
-            'serviceKey': service_key,
-            'PNU_CD': pnu_code,
-       
-        }
-       
-        try:
-            response = requests.get(url, params=params)
-            if response.status_code == 200:
-                return response.text # 성공 시 데이터 반환
-            else:
-                return None
-        except Exception as e:
-            return str(e)
+        background:white;
+
+        font-size:28px;
+        font-weight:700;
+
+        box-shadow:0 8px 20px rgba(0,0,0,0.06);
+
+        transition:0.3s;
+    }
+
+    .stButton > button:hover {
+        border:3px solid #22c55e;
+        transform:translateY(-5px);
+        box-shadow:0 12px 30px rgba(34,197,94,0.2);
+    }
+
+    </style>
+                
+    """, unsafe_allow_html=True)
+
+
+    st.progress(80)
+
     
+    st.markdown("""
+    <div style='text-align:center;padding:20px'>
+        <h1>🌱심을 계절이 언제 인가요?</h1>
+        <p style='font-size:20px;color:gray'>
+        계절에 따라 추천 작물이 달라집니다
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-
-
-   
     
+    col1, col2, col3, col4 = st.columns(4, gap="large")
+
+    with col1:
+        if st.button("🌸\n\n봄",use_container_width=True):
+            st.session_state.season = "봄"
+            go_to_page(5)
+  
+    with col2:
+        if st.button("🌞\n\n여름",use_container_width=True):
+            st.session_state.season = "여름"
+            go_to_page(5)
+  
+
+    with col3:  
+
+        if st.button("🍂\n\n가을",use_container_width=True):
+            st.session_state.season = "가을"
+            go_to_page(5)
+
+
+    with col4:
+        if st.button("⛄\n\n겨울",use_container_width=True):
+            st.session_state.season = "겨울"
+            go_to_page(5)
+
+
+
+
+# ==========================================
+# 5페이지
+# ==========================================
+elif st.session_state.page == 5:
+    st.markdown("""
+    <style>
+
+    div.stButton > button p {
+        font-size: 30px !important;
+        font-weight: 900 !important;
+    }
+
+    div.stButton > button:hover {
+        background-color: #16a34a;
+        transform: translateY(-2px);
+    }
+    </style>
+
+    """, unsafe_allow_html=True)
+    st.empty()
+    address = st.session_state.get("full_address", "")
+    st.markdown(f"""
+    <div style='text-align:center;padding:20px'>
+        <p style="font-size:26px;color:#555;">
+            <b>🍅{address}</b>에서 기를 수 있는
+        </p>
+        <h1 style="color:#22c55e;">
+            맞춤 작물을 추천해드립니다
+        </h1>
+
+    </div>
+    """, unsafe_allow_html=True)
+
 # =========================
 # Gemini에 전달할 데이터
 # =========================
 
 
-    if st.button("나에게 맞는 작물 찾기"):
-        with st.spinner("🌱 토양 정보를 분석하는 중입니다..."):
-            result = get_soil_data(st.session_state["pnu"], CONFIRM_KEY)
+    with st.spinner("🌱 토양 정보를 분석하는 중입니다..."):
+        result = get_soil_data(st.session_state["pnu"], CONFIRM_KEY)
         
-        if result:
-            root = ET.fromstring(result)
-            item = root.find(".//item")
-            soil_data = {
+    if result:
+        root = ET.fromstring(result)
+        item = root.find(".//item")
+        soil_data = {
         "배수등급": drainage_map.get(
             item.findtext("Soildra_Cd"),
             "알수없음"
@@ -689,10 +784,10 @@ elif st.session_state.page == 4:
             "알수없음"
         )
     }
-            print(soil_data)
-            genai.configure(api_key=api_key_ai)
-            model = genai.GenerativeModel('gemini-3.5-flash' )
-            context = f"""
+        print(soil_data)
+        genai.configure(api_key=api_key_ai)
+        model = genai.GenerativeModel('gemini-3.5-flash' )
+        context = f"""
                 너는 전문 농업 컨설턴트이다.
 
                 사용자는 초보 농부이다.
@@ -702,6 +797,9 @@ elif st.session_state.page == 4:
 
                 재배 목적:
                 {st.session_state["purpose"]}
+
+                심을 계절:
+                {st.session_state["season"]}
 
                 토양 정보:
                 {soil_data}
@@ -715,16 +813,23 @@ elif st.session_state.page == 4:
                 - 삼겹살 파티용이면 상추, 깻잎 등 쌈채소 계열 우선
                 - 아이들 교육용이면 성장 과정이 잘 보이는 작물 우선
                 - 더 간결하게 한 작물당 3줄 정도로 보기 쉽게
+                -봄에 심을 거면 봄에 심어야하는 식물 우선
+                -여름에 심을 거면 여름에 심어야하는 식물 우선
+                -가을에  심을 거면 가을에 심어야하는 식물 우선
+                -겨울에 심을 거면 겨울에 심어야하는 식물 우선
 
                 위 조건과 토양 정보를 함께 고려하여
                 작물 TOP3를 추천하시오.
                 """
-            with st.spinner("🤖 AI가 작물을 추천하는 중입니다..."):
+        with st.spinner("🤖 AI가 작물을 추천하는 중입니다..."):
                 response=model.generate_content(context)
-            st.write(response.text)
+        st.write(response.text)
 
-        else:
-            st.error("데이터 불러오기 실패")
+
+
+    else:
+        st.error("데이터 불러오기 실패")
+    
             
 
 
